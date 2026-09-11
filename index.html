@@ -37,6 +37,7 @@
   <div class="mnav-row">
     <button class="mnav-btn active" data-view="lecture">讲解</button>
     <button class="mnav-btn" data-view="quiz">答题</button>
+    <button class="mnav-btn" data-view="fill">填空</button>
     <button class="mnav-btn" data-view="stats">统计</button>
   </div>
   <div class="mnav-row">
@@ -50,6 +51,7 @@
     <div class="modes" data-page-node-id="w2Y9AiSaQCDQcofcfK2WYH">
       <button class="mode-btn active" data-view="lecture" data-page-node-id="vT5eYsqDYYDouJ5YwDCKdF">讲解</button>
       <button class="mode-btn" data-view="quiz" data-page-node-id="hnIJFOmjjZzQ1Qm4WbHAPd">答题</button>
+      <button class="mode-btn" data-view="fill">填空</button>
       <button class="mode-btn" data-view="stats" data-page-node-id="UrGAMDkPQZjWsrbLzvoBL4">统计</button>
     </div>
     <div class="chap-title" data-page-node-id="GrRc2D6kDjhtg6lw3TodhF">章节目录</div>
@@ -151,6 +153,62 @@
       </div>
     </section>
 
+    <!-- ============ 填空题视图（巩固模式） ============ -->
+    <section id="view-fill" class="view hidden">
+      <div class="quiz-bar">
+        <select id="ffChapter"><option value="all">全部章节</option></select>
+        <select id="ffScope">
+          <option value="all">全部题目</option>
+          <option value="undo">未作答</option>
+          <option value="wrong">我的错题</option>
+          <option value="right">已答对</option>
+        </select>
+        <label class="shuffle"><input type="checkbox" id="ffShuffle"> 随机打乱</label>
+        <span class="quiz-range" id="ffRange">—</span>
+      </div>
+      <div class="fill-stats" id="ffStats"></div>
+
+      <div class="qcard">
+        <div class="qmeta">
+          <span class="tag" id="fqChapter">章节</span>
+          <span class="tag type" id="fqType">填空题</span>
+          <span class="tag idx" id="fqIdx">1 / 1</span>
+          <span class="tag src" id="fqSourceTag">出处</span>
+        </div>
+        <h3 class="qtext" id="fqText"></h3>
+        <div class="options" id="fqOptions"></div>
+
+        <div class="feedback hidden" id="fqFeedback">
+          <div class="fb-head" id="ffbHead"></div>
+          <div class="fb-body">
+            <div class="fb-block">
+              <div class="fb-label">正确答案</div>
+              <div class="fb-answer" id="ffbAnswer"></div>
+            </div>
+            <div class="fb-block">
+              <div class="fb-label">为什么</div>
+              <div class="fb-explain" id="ffbExplain"></div>
+            </div>
+            <div class="fb-block">
+              <div class="fb-label">出处</div>
+              <div class="fb-source" id="ffbSource"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="qactions">
+          <button class="ctrl-btn" id="fqPrev">上一题</button>
+          <button class="ctrl-btn ghost" id="fqMark">标记错题</button>
+          <button class="ctrl-btn primary" id="fqNext">提交答案</button>
+        </div>
+      </div>
+
+      <div class="jump">
+        <div class="jump-label">快速跳题</div>
+        <div class="jump-grid" id="fjumpGrid"></div>
+      </div>
+    </section>
+
     <!-- ============ 统计视图 ============ -->
     <section id="view-stats" class="view hidden" data-page-node-id="GYa8fN7luwQYHF5KLp4s4r">
       <h2 class="sec-title" data-page-node-id="kWdgmSGsVbArYwYUoKQYSC">学习统计</h2>
@@ -214,6 +272,7 @@
 <script src="data/ch12.js"></script>
 <script src="data/ch13.js"></script>
 <script src="data/ch14.js"></script>
+<script src="data/fill.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

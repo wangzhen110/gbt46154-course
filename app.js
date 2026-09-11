@@ -435,7 +435,7 @@
   /* ============ 视图切换 ============ */
   function switchView(v) {
     view = v;
-    ['lecture', 'quiz', 'stats'].forEach(function (n) {
+    ['lecture', 'quiz', 'fill', 'stats'].forEach(function (n) {
       $('view-' + n).classList.toggle('hidden', n !== v);
     });
     document.querySelectorAll('.mode-btn, .mnav-btn[data-view]').forEach(function (b) {
@@ -444,6 +444,7 @@
     if (v !== 'lecture') stopPlay();
     if (v === 'lecture') renderSlide();
     if (v === 'stats') renderStats();
+    if (v === 'fill' && !fpool.length) fApplyFilter();
     if (v === 'quiz' && !pool.length) {
       $('fChapter').value = String(CHAPTERS[curChap].id);
       applyFilter(false);
@@ -593,6 +594,185 @@
     });
   }
 
+  /* ============ 填空题（巩固模式） ============ */
+  var FILL = window.FILL || null;
+  var FPOOL = [];
+  if (FILL && FILL.questions) {
+    FILL.questions.forEach(function (q, i) { FPOOL.push({ ch: FILL, q: q, gid: 'F' + i }); });
+  }
+  var FKEY = 'gbt46154_fill_v1';
+  var STF = { ans: {}, mark: {} };
+  try { var rf = localStorage.getItem(FKEY); if (rf) STF = JSON.parse(rf); } catch (e) {}
+  if (!STF.ans) STF.ans = {};
+  if (!STF.mark) STF.mark = {};
+  function fsave() { try { localStorage.setItem(FKEY, JSON.stringify(STF)); } catch (e) {} }
+
+  var fpool = [];
+  var fq = 0;
+  var fanswered = false;
+
+  function normIn(s) {
+    return ('' + s).trim()
+      .replace(/[\uFF01-\uFF5E]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); })
+      .replace(/\u3000/g, ' ')
+      .toUpperCase();
+  }
+  function fMatch(acc, val) {
+    return acc.some(function (a) { return normIn(a) === normIn(val); });
+  }
+  function fStats() {
+    var done = 0, right = 0;
+    for (var k in STF.ans) { if (STF.ans.hasOwnProperty(k)) { done++; if (STF.ans[k].ok) right++; } }
+    return { done: done, right: right, rate: done ? Math.round(right / done * 100) : null };
+  }
+  function fRenderStats() {
+    var st = fStats();
+    $('ffStats').textContent = '填空题库共 ' + FPOOL.length + ' 题 · 已答 ' + st.done +
+      ' · 答对 ' + st.right + (st.rate !== null ? ' · 正确率 ' + st.rate + '%' : '');
+  }
+  function fApplyFilter() {
+    var ch = $('ffChapter').value;
+    var sc = $('ffScope').value;
+    fpool = FPOOL.filter(function (it) {
+      if (ch !== 'all' && it.q.ch !== parseInt(ch, 10)) return false;
+      var rec = STF.ans[it.gid];
+      if (sc === 'undo') return !rec;
+      if (sc === 'wrong') return rec && !rec.ok;
+      if (sc === 'right') return rec && rec.ok;
+      return true;
+    });
+    if ($('ffShuffle').checked) fpool.sort(function () { return Math.random() - 0.5; });
+    fq = 0;
+    if (!fpool.length) { fRenderEmpty(); return; }
+    fRenderQ();
+  }
+  function fRenderEmpty() {
+    $('fqChapter').textContent = '无匹配题目';
+    $('fqType').textContent = '—';
+    $('fqIdx').textContent = '0 / 0';
+    $('fqSourceTag').textContent = '—';
+    $('fqText').textContent = '当前筛选条件下没有填空题，请调整章节或范围。';
+    $('fqOptions').innerHTML = '';
+    $('fqFeedback').classList.add('hidden');
+    $('ffRange').textContent = '0 题';
+    $('fjumpGrid').innerHTML = '';
+    $('fqNext').textContent = '下一题 →';
+    fRenderStats();
+  }
+  function fRenderQ() {
+    var it = fpool[fq];
+    var q = it.q;
+    fanswered = false;
+    var rec = STF.ans[it.gid];
+
+    $('fqChapter').textContent = '第' + q.ch + '章';
+    $('fqType').textContent = '填空题';
+    $('fqIdx').textContent = (fq + 1) + ' / ' + fpool.length;
+    $('fqSourceTag').textContent = '出处见解析';
+    $('fqText').textContent = q.q;
+    $('ffRange').textContent = '共 ' + fpool.length + ' 题';
+
+    var wrap = $('fqOptions');
+    wrap.innerHTML = '';
+    wrap.className = 'options fill-opts';
+    q.a.forEach(function (_, i) {
+      var d = document.createElement('div');
+      d.className = 'fill-row';
+      d.innerHTML = '<span class="fill-no">第 ' + (i + 1) + ' 空</span>' +
+        '<input class="fill-input" type="text" autocomplete="off" placeholder="在此输入答案">';
+      wrap.appendChild(d);
+    });
+
+    $('fqFeedback').classList.add('hidden');
+    $('fqMark').style.display = 'none';
+
+    if (rec) {
+      fanswered = true;
+      fShowResult(rec.ok, rec.pick);
+    } else {
+      $('fqNext').textContent = '提交答案';
+    }
+    fRenderJump();
+    fRenderStats();
+  }
+  function fSubmit() {
+    var it = fpool[fq];
+    var q = it.q;
+    var inputs = document.querySelectorAll('#fqOptions .fill-input');
+    var vals = [];
+    for (var i = 0; i < inputs.length; i++) vals.push(inputs[i].value.trim());
+    var empty = vals.filter(function (v) { return v === ''; }).length;
+    if (empty) {
+      alert('还有 ' + empty + ' 个空未填写，请填完再提交。');
+      return;
+    }
+    var ok = q.a.length === vals.length && q.a.every(function (acc, i) { return fMatch(acc, vals[i]); });
+    STF.ans[it.gid] = { ok: ok, pick: vals };
+    fsave();
+    fanswered = true;
+    fShowResult(ok, vals);
+    fRenderJump();
+    fRenderStats();
+  }
+  function fShowResult(ok, pick) {
+    var it = fpool[fq];
+    var q = it.q;
+    var fb = $('fqFeedback');
+    fb.classList.remove('hidden');
+    var head = $('ffbHead');
+    head.className = 'fb-head ' + (ok ? 'ok' : 'bad');
+    head.textContent = ok ? '✓ 回答正确' : '✗ 回答错误';
+    $('ffbAnswer').textContent = q.a.map(function (acc, i) {
+      return '第' + (i + 1) + '空：' + acc.join(' 或 ');
+    }).join('　|　');
+    $('ffbExplain').textContent = q.e;
+    $('ffbSource').textContent = q.s;
+    var inputs = document.querySelectorAll('#fqOptions .fill-input');
+    for (var i = 0; i < inputs.length; i++) {
+      inputs[i].disabled = true;
+      var okk = fMatch(q.a[i], pick[i]);
+      inputs[i].classList.add(okk ? 'right' : 'wrong');
+      if (!okk) { inputs[i].value = q.a[i][0]; inputs[i].classList.add('show-ans'); }
+    }
+    $('fqMark').style.display = 'inline-block';
+    $('fqMark').textContent = STF.mark[it.gid] ? '已标记 ★' : '标记错题';
+    $('fqNext').textContent = '下一题 →';
+  }
+  function fRenderJump() {
+    var g = $('fjumpGrid'); g.innerHTML = '';
+    fpool.forEach(function (it, i) {
+      var rec = STF.ans[it.gid];
+      var b = document.createElement('button');
+      b.className = 'jump-btn' + (i === fq ? ' cur' : '') + (rec ? (rec.ok ? ' right' : ' wrong') : '');
+      b.textContent = i + 1;
+      b.onclick = function () { fq = i; fRenderQ(); window.scrollTo(0, 0); };
+      g.appendChild(b);
+    });
+  }
+  if ($('ffChapter')) {
+    var fsel = $('ffChapter');
+    CHAPTERS.forEach(function (c) {
+      var o = document.createElement('option');
+      o.value = c.id; o.textContent = '第' + c.id + '章';
+      fsel.appendChild(o);
+    });
+    $('fqPrev').onclick = function () { if (fq > 0) { fq--; fRenderQ(); window.scrollTo(0, 0); } };
+    $('fqNext').onclick = function () {
+      if (!fanswered) { fSubmit(); return; }
+      if (fq < fpool.length - 1) { fq++; fRenderQ(); window.scrollTo(0, 0); }
+    };
+    $('fqMark').onclick = function () {
+      var it = fpool[fq];
+      if (STF.mark[it.gid]) delete STF.mark[it.gid]; else STF.mark[it.gid] = 1;
+      fsave();
+      $('fqMark').textContent = STF.mark[it.gid] ? '已标记 ★' : '标记错题';
+    };
+    $('ffChapter').onchange = fApplyFilter;
+    $('ffScope').onchange = fApplyFilter;
+    $('ffShuffle').onchange = fApplyFilter;
+    fApplyFilter();
+  }
+
   /* ============ 初始化 ============ */
   var sel = $('fChapter');
   CHAPTERS.forEach(function (c) {
@@ -607,12 +787,14 @@
   $('totalCount').textContent = ALL.length;
 
   document.addEventListener('keydown', function (e) {
-    if (view !== 'quiz') return;
-    if (e.key >= '1' && e.key <= '6') {
-      var i = parseInt(e.key, 10) - 1;
-      var nodes = $('qOptions').children;
-      if (nodes[i] && !answered) nodes[i].click();
+    if (view === 'quiz') {
+      if (e.key >= '1' && e.key <= '6') {
+        var i = parseInt(e.key, 10) - 1;
+        var nodes = $('qOptions').children;
+        if (nodes[i] && !answered) nodes[i].click();
+      }
+      if (e.key === 'Enter') $('qNext').click();
     }
-    if (e.key === 'Enter') $('qNext').click();
+    if (view === 'fill' && e.key === 'Enter') $('fqNext').click();
   });
 })();
