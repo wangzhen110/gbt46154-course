@@ -100,6 +100,7 @@
     if (p.includes('第2章') || p === '2 规范性引用文件') return '第2章 规范性引用文件';
     if (p.includes('第3章')) return '第3章 术语、定义和符号';
     if (p.includes('第4章') || p === '4 重大危险清单') return '第4章 重大危险清单';
+    if (p.includes('第5章')) return '第5章 安全要求';
     if (p.includes('第6章')) return '第6章 验证';
     if (p.includes('第7章')) return '第7章 使用信息';
     if (p.includes('附录A')) return '附录A 重大危险清单';
@@ -118,6 +119,44 @@
     if (am) return am[1] + '.' + am[2];
     return null;
   }
+  /* 条款内容格式化：OCR 微清洗 + 分段 + 列表项结构化 */
+  function fmtKbText(c, title) {
+    var t = c.replace(/\s+/g, ' ').trim();
+    // OCR 微清洗：拆行数字点 "0. 40m/s" → "0.40m/s"、"5. 2" → "5.2"
+    t = t.replace(/(\d)\.\s+(\d)/g, '$1.$2');
+    // 去掉开头的重复标题（如 "额定载重量 制造单位应说明..."）
+    if (title && t.indexOf(title) === 0) t = t.slice(title.length).replace(/\s+/g, ' ').trim();
+    var html = '';
+    // 定位列表标记 a) 1)
+    var markerRe = /([a-z]\)|\d+\))\s/g;
+    var idx = [], m;
+    markerRe.lastIndex = 0;
+    while ((m = markerRe.exec(t))) {
+      idx.push({ start: m.index, tag: m[1].slice(0, -1), contentStart: m.index + m[0].length });
+    }
+    if (!idx.length) return fmtKbParas(t);
+    // 前导段落（第一个列表标记之前）
+    if (idx[0].start > 0) html += fmtKbParas(t.slice(0, idx[0].start));
+    // 列表项
+    for (var k = 0; k < idx.length; k++) {
+      var end = k + 1 < idx.length ? idx[k + 1].start : t.length;
+      var content = t.slice(idx[k].contentStart, end).replace(/\s+/g, ' ').trim();
+      if (!content) continue;
+      html += '<div class="kb-li"><span class="kb-tag">' + escHtml(idx[k].tag) + ')</span><span>' + escHtml(content) + '</span></div>';
+    }
+    return html;
+  }
+  function fmtKbParas(s) {
+    var sents = s.split(/(?<=。|；)/).map(function (x) { return x.trim(); }).filter(Boolean);
+    if (!sents.length) return '';
+    if (sents.length === 1) return '<p>' + escHtml(sents[0]) + '</p>';
+    var html = '', buf = '';
+    for (var k = 0; k < sents.length; k++) {
+      buf += sents[k];
+      if ((k + 1) % 3 === 0 || k === sents.length - 1) { html += '<p>' + escHtml(buf) + '</p>'; buf = ''; }
+    }
+    return html;
+  }
   function openKb(src, label) {
     if (!window.KB) { alert('知识库未加载'); return; }
     var parts = src.split(/[；;，,、+~～]/).map(function (s) { return s.trim(); }).filter(Boolean);
@@ -126,11 +165,11 @@
       var key = kbMap(p);
       var entry = key && (KB.items[key] || KB.special[key] || KB.standards[key]);
       if (entry) {
-        var head = '<div class="kb-key">' + escHtml(key) + (entry.t ? ' ' + escHtml(entry.t) : '') + '</div>';
-        var text = '<div class="kb-text">' + escHtml(entry.c) + '</div>';
+        var head = '<div class="kb-key"><span class="kb-key-no">' + escHtml(key) + '</span>' + (entry.t ? '<span class="kb-key-t">' + escHtml(entry.t) + '</span>' : '') + '</div>';
+        var text = '<div class="kb-text">' + fmtKbText(entry.c, entry.t) + '</div>';
         html += '<div class="kb-item">' + head + text + '</div>';
       } else {
-        html += '<div class="kb-item"><div class="kb-key">' + escHtml(p) + '</div><div class="kb-text">（该出处暂无知识库条目）</div></div>';
+        html += '<div class="kb-item"><div class="kb-key"><span class="kb-key-no">' + escHtml(p) + '</span></div><div class="kb-text"><p>（该出处暂无知识库条目）</p></div></div>';
       }
     });
     $('kbTitle').textContent = label + '：' + src;
