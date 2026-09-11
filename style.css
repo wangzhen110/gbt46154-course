@@ -199,6 +199,11 @@ button{font-family:inherit;cursor:pointer}
 .fill-input.show-ans{font-weight:700}
 .fill-input:disabled{cursor:default;opacity:1}
 
+/* 引用规范链接（跳转国家标准全文公开系统） */
+.std-link{color:var(--accent);text-decoration:underline;text-underline-offset:2px;cursor:pointer;font-weight:600}
+.std-link:hover{color:#1a5fb4;text-decoration:underline}
+.std-link:visited{color:#5b6b8c}
+
 .feedback{margin-top:18px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
 .fb-head{padding:11px 18px;font-weight:700;font-size:15px}
 .fb-head.ok{background:var(--ok-soft);color:var(--ok)}

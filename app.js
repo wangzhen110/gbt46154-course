@@ -46,6 +46,55 @@
   var answered = false;      // 当前题是否已提交
   var chosen = [];
 
+  /* ---------- 引用规范链接化（跳转国家标准全文公开系统） ---------- */
+  var STD_RE = /((?:GB(?:\/T|\/Z)?|JB(?:\/T)?|TSG|AQ|GA|YD(?:\/T)?|DL(?:\/T)?|JGJ|QB(?:\/T)?|HG(?:\/T)?|WS(?:\/T)?|SN(?:\/T)?)\s?-?\s?\d{3,5}(?:\.\d+)*)(?:—\d{4})?(?![0-9])/g;
+  function stdUrl(code) {
+    var q = code.replace(/—/g, '-').trim();
+    return 'https://openstd.samr.gov.cn/bzgk/gb/std_list?p.p1=0&p.p2=' + encodeURIComponent(q);
+  }
+  function escHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  /* 纯文本 → 带链接的 HTML（用于解析文本） */
+  function linkStandards(txt) {
+    return escHtml(txt).replace(STD_RE, function (m) {
+      return '<a class="std-link" href="' + stdUrl(m) + '" target="_blank" rel="noopener noreferrer">' + m + '</a>';
+    });
+  }
+  /* 已渲染的 HTML 节点 → 遍历文本节点加链接（用于讲解/速查表） */
+  function linkStdNodes(root) {
+    if (!root || !root.querySelectorAll) return;
+    var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: function (node) {
+        var p = node.parentNode;
+        if (p && p.closest && p.closest('a,button,script,style')) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    var list = [];
+    while (w.nextNode()) list.push(w.currentNode);
+    list.forEach(function (n) {
+      var txt = n.nodeValue;
+      if (!STD_RE.test(txt)) return;
+      STD_RE.lastIndex = 0;
+      var frag = document.createDocumentFragment(), last = 0, m;
+      while ((m = STD_RE.exec(txt))) {
+        if (m.index > last) frag.appendChild(document.createTextNode(txt.slice(last, m.index)));
+        var a = document.createElement('a');
+        a.className = 'std-link';
+        a.href = stdUrl(m[0]);
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.textContent = m[0];
+        frag.appendChild(a);
+        last = m.index + m[0].length;
+      }
+      if (last < txt.length) frag.appendChild(document.createTextNode(txt.slice(last)));
+      n.parentNode.replaceChild(frag, n);
+    });
+    STD_RE.lastIndex = 0;
+  }
+
   /* ============ 章节导航 ============ */
   function buildNav() {
     var nav = $('chapNav');
@@ -76,6 +125,7 @@
     var html = '<h3>' + sl.h + '</h3>' + sl.body;
     if (sl.src) html += '<div class="src">出处：' + sl.src + '</div>';
     $('lecSlide').innerHTML = html;
+    linkStdNodes($('lecSlide'));
     $('lecIdx').textContent = (slideIdx + 1) + ' / ' + c.slides.length;
     $('lecBar').style.width = ((slideIdx + 1) / c.slides.length * 100) + '%';
     var dots = $('lecDots'); dots.innerHTML = '';
@@ -327,7 +377,7 @@
     head.className = 'fb-head ' + (ok ? 'ok' : 'bad');
     head.textContent = ok ? '✓ 回答正确' : '✗ 回答错误';
     $('fbAnswer').textContent = q.a.map(function (x) { return LETTERS[x] + '. ' + optsOf(q)[x]; }).join('　|　');
-    $('fbExplain').textContent = q.e;
+    $('fbExplain').innerHTML = linkStandards(q.e);
     $('fbSource').textContent = q.s;
     $('qMark').style.display = 'inline-block';
     $('qMark').textContent = ST.mark[it.gid] ? '已标记 ★' : '标记错题';
@@ -725,7 +775,7 @@
     $('ffbAnswer').textContent = q.a.map(function (acc, i) {
       return '第' + (i + 1) + '空：' + acc.join(' 或 ');
     }).join('　|　');
-    $('ffbExplain').textContent = q.e;
+    $('ffbExplain').innerHTML = linkStandards(q.e);
     $('ffbSource').textContent = q.s;
     var inputs = document.querySelectorAll('#fqOptions .fill-input');
     for (var i = 0; i < inputs.length; i++) {
