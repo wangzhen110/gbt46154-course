@@ -1437,6 +1437,7 @@ window.KB = {"items":{"3.1":{"t":"术语和定义","c":"术语和定义 下列�
   /* ---------- 知识库（课程内知识点） ---------- */
   function kbMap(p) {
     if (!window.KB) return null;
+    if (KB.standards && KB.standards[p]) return p; // 规范号直接命中
     if (p.includes('封面')) return '封面';
     if (p.includes('前言')) return '前言';
     if (p.includes('引言')) return '引言';
