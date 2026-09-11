@@ -4,7 +4,7 @@
  *   - 静态资源(CSS/JS/图标) → cache-first：秒开，靠 CACHE 版本号控制更新
  * 注意：每次改动站点文件后必须递增 CACHE_VERSION，否则老用户会一直看到旧缓存。
  */
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE = 'gbt46154-' + CACHE_VERSION;
 
 const ASSETS = [
@@ -18,7 +18,7 @@ const ASSETS = [
   './data/ch01.js', './data/ch02.js', './data/ch03.js', './data/ch04.js',
   './data/ch05.js', './data/ch06.js', './data/ch07.js', './data/ch08.js',
   './data/ch09.js', './data/ch10.js', './data/ch11.js', './data/ch12.js',
-  './data/ch13.js', './data/ch14.js'
+  './data/ch13.js', './data/ch14.js', './data/fill.js'
 ];
 
 self.addEventListener('install', (e) => {
