@@ -46,22 +46,18 @@
   var answered = false;      // 当前题是否已提交
   var chosen = [];
 
-  /* ---------- 引用规范链接化（跳转国家标准全文公开系统） ---------- */
+  /* ---------- 引用规范链接化（课程内知识库跳转） ---------- */
   var STD_RE = /((?:GB(?:\/T|\/Z)?|JB(?:\/T)?|TSG|AQ|GA|YD(?:\/T)?|DL(?:\/T)?|JGJ|QB(?:\/T)?|HG(?:\/T)?|WS(?:\/T)?|SN(?:\/T)?)\s?-?\s?\d{3,5}(?:\.\d+)*)(?:—\d{4})?(?![0-9])/g;
-  function stdUrl(code) {
-    var q = code.replace(/—/g, '-').trim();
-    return 'https://openstd.samr.gov.cn/bzgk/gb/std_list?p.p1=0&p.p2=' + encodeURIComponent(q);
-  }
   function escHtml(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
-  /* 纯文本 → 带链接的 HTML（用于解析文本） */
+  /* 纯文本 → 带 data-kb 链接的 HTML（用于解析文本，点击打开课程内知识库） */
   function linkStandards(txt) {
     return escHtml(txt).replace(STD_RE, function (m) {
-      return '<a class="std-link" href="' + stdUrl(m) + '" target="_blank" rel="noopener noreferrer">' + m + '</a>';
+      return '<a class="std-link" data-kb="' + m + '">' + m + '</a>';
     });
   }
-  /* 已渲染的 HTML 节点 → 遍历文本节点加链接（用于讲解/速查表） */
+  /* 已渲染的 HTML 节点 → 遍历文本节点加链接 */
   function linkStdNodes(root) {
     if (!root || !root.querySelectorAll) return;
     var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
@@ -82,9 +78,7 @@
         if (m.index > last) frag.appendChild(document.createTextNode(txt.slice(last, m.index)));
         var a = document.createElement('a');
         a.className = 'std-link';
-        a.href = stdUrl(m[0]);
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
+        a.dataset.kb = m[0];
         a.textContent = m[0];
         frag.appendChild(a);
         last = m.index + m[0].length;
@@ -94,6 +88,56 @@
     });
     STD_RE.lastIndex = 0;
   }
+
+  /* ---------- 知识库（课程内知识点） ---------- */
+  function kbMap(p) {
+    if (!window.KB) return null;
+    if (KB.standards && KB.standards[p]) return p; // 规范号直接命中
+    if (p.includes('封面')) return '封面';
+    if (p.includes('前言')) return '前言';
+    if (p.includes('引言')) return '引言';
+    if (p.includes('第1章') || p === '1 范围') return '第1章 范围';
+    if (p.includes('第2章') || p === '2 规范性引用文件') return '第2章 规范性引用文件';
+    if (p.includes('第3章')) return '第3章 术语、定义和符号';
+    if (p.includes('第4章') || p === '4 重大危险清单') return '第4章 重大危险清单';
+    if (p.includes('第6章')) return '第6章 验证';
+    if (p.includes('第7章')) return '第7章 使用信息';
+    if (p.includes('附录A')) return '附录A 重大危险清单';
+    if (p.includes('附录B')) return '附录B 风机电梯试验';
+    if (p.includes('附录C')) return '附录C 起升机构试验';
+    if (p.includes('附录D')) return '附录D 计算方法指南';
+    if (p.includes('附录E')) return '附录E 超速安全装置和防坠落装置试验';
+    if (p.includes('附录F')) return '附录F 层门强度试验';
+    if (p.includes('附录G')) return '附录G 疏散与救援';
+    if (p.includes('图3') || p.includes('图4')) return '图3、图4 标引说明';
+    var tm = p.match(/^(表\d+)/);
+    if (tm) return tm[1];
+    var cm = p.match(/^(\d+(?:\.\d+)+)/);
+    if (cm) return cm[1];
+    var am = p.match(/^([A-G])\.(\d+(?:\.\d+)*)/);
+    if (am) return am[1] + '.' + am[2];
+    return null;
+  }
+  function openKb(src, label) {
+    if (!window.KB) { alert('知识库未加载'); return; }
+    var parts = src.split(/[；;，,、+~～]/).map(function (s) { return s.trim(); }).filter(Boolean);
+    var html = '';
+    parts.forEach(function (p) {
+      var key = kbMap(p);
+      var entry = key && (KB.items[key] || KB.special[key] || KB.standards[key]);
+      if (entry) {
+        var head = '<div class="kb-key">' + escHtml(key) + (entry.t ? ' ' + escHtml(entry.t) : '') + '</div>';
+        var text = '<div class="kb-text">' + escHtml(entry.c) + '</div>';
+        html += '<div class="kb-item">' + head + text + '</div>';
+      } else {
+        html += '<div class="kb-item"><div class="kb-key">' + escHtml(p) + '</div><div class="kb-text">（该出处暂无知识库条目）</div></div>';
+      }
+    });
+    $('kbTitle').textContent = label + '：' + src;
+    $('kbBody').innerHTML = html;
+    $('kbModal').classList.remove('hidden');
+  }
+  function closeKb() { $('kbModal').classList.add('hidden'); }
 
   /* ============ 章节导航 ============ */
   function buildNav() {
@@ -378,7 +422,7 @@
     head.textContent = ok ? '✓ 回答正确' : '✗ 回答错误';
     $('fbAnswer').textContent = q.a.map(function (x) { return LETTERS[x] + '. ' + optsOf(q)[x]; }).join('　|　');
     $('fbExplain').innerHTML = linkStandards(q.e);
-    $('fbSource').textContent = q.s;
+    $('fbSource').innerHTML = '<button type="button" class="src-link" data-src="' + escHtml(q.s) + '">出处：' + escHtml(q.s) + ' <span class="src-arrow">▸</span></button>';
     $('qMark').style.display = 'inline-block';
     $('qMark').textContent = ST.mark[it.gid] ? '已标记 ★' : '标记错题';
     $('qNext').textContent = '下一题 →';
@@ -547,6 +591,17 @@
     $('syncSum').textContent = '当前设备进度：已答 ' + p.done + ' 题，答对 ' + p.right + ' 题。';
   }
   function closeSync() { $('syncModal').classList.add('hidden'); }
+
+  /* 知识库弹窗事件（出处/规范号点击 → 课程内知识点） */
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest ? e.target.closest('.src-link, .std-link') : null;
+    if (!el) return;
+    e.preventDefault();
+    var src = el.dataset.kb || el.dataset.src || el.textContent.trim();
+    openKb(src, el.classList.contains('std-link') ? '引用规范' : '出处');
+  });
+  $('kbClose').onclick = closeKb;
+  $('kbMask').onclick = closeKb;
 
   $('btnSync2').onclick = openSync;
   $('mSync').onclick = openSync;
@@ -780,7 +835,7 @@
       return '第' + (i + 1) + '空：' + acc.join(' 或 ');
     }).join('　|　');
     $('ffbExplain').innerHTML = linkStandards(q.e);
-    $('ffbSource').textContent = q.s;
+    $('ffbSource').innerHTML = '<button type="button" class="src-link" data-src="' + escHtml(q.s) + '">出处：' + escHtml(q.s) + ' <span class="src-arrow">▸</span></button>';
     var inputs = document.querySelectorAll('#fqOptions .fill-input');
     for (var i = 0; i < inputs.length; i++) {
       inputs[i].disabled = true;

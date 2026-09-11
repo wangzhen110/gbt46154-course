@@ -246,6 +246,18 @@
   </div>
 </div>
 
+<!-- 知识库弹窗（出处/引用规范点击后在课程内查看知识点，不跳外部网页） -->
+<div class="modal hidden" id="kbModal">
+  <div class="modal-mask" id="kbMask"></div>
+  <div class="modal-box kb-box">
+    <div class="modal-head">
+      <h3 id="kbTitle">知识点</h3>
+      <button class="modal-x" id="kbClose">×</button>
+    </div>
+    <div class="modal-body kb-body" id="kbBody"></div>
+  </div>
+</div>
+
 <!-- 添加到主屏幕提示 -->
 <div class="install-tip hidden" id="installTip">
   <div class="it-text">
@@ -273,6 +285,7 @@
 <script src="data/ch13.js"></script>
 <script src="data/ch14.js"></script>
 <script src="data/fill.js"></script>
+<script src="data/kb.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
