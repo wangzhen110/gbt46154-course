@@ -662,9 +662,13 @@
   var fanswered = false;
 
   function normIn(s) {
-    return ('' + s).trim()
+    return ('' + s)
+      // 去掉不可见字符（零宽空格/BOM/软连字符等，复制粘贴或输入法常带入，trim 去不掉）
+      .replace(/[\u200B-\u200D\uFEFF\u2060\u180E\u00AD\u00A0]/g, '')
       .replace(/[\uFF01-\uFF5E]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); })
       .replace(/\u3000/g, ' ')
+      .trim()
+      .replace(/\s+/g, ' ')
       .toUpperCase();
   }
   function fMatch(acc, val) {
